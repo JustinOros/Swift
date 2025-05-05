@@ -13,9 +13,10 @@ struct ContentView: View {
     @State private var isMPH = true
     @State private var previousLocation: CLLocation?
     @State private var tripDistanceMeters: Double = 0.0
+    @State private var isDarkMode = true // 🌗 Track current theme
 
     var currentSpeed: Int {
-        let multiplier = isMPH ? 1.0 : 1.60934 // Already in MPH from LocationManager
+        let multiplier = isMPH ? 1.0 : 1.60934
         return Int(Double(locationManager.speed) * multiplier)
     }
 
@@ -40,38 +41,46 @@ struct ContentView: View {
         }
     }
 
+    var foregroundColor: Color {
+        isDarkMode ? .white : .black
+    }
+
+    var secondaryTextColor: Color {
+        isDarkMode ? .gray : .gray
+    }
+
+    var backgroundColor: Color {
+        isDarkMode ? .black : .white
+    }
+
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            backgroundColor.ignoresSafeArea()
 
             VStack(spacing: 30) {
                 Spacer()
 
-                // Center Speed Display with Unit
                 HStack(alignment: .bottom, spacing: 4) {
                     Text("\(currentSpeed)")
                         .font(.system(size: 140, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(foregroundColor)
 
                     Text(unitLabel)
                         .font(.title2)
-                        .foregroundColor(.gray)
+                        .foregroundColor(secondaryTextColor)
                         .onTapGesture {
                             isMPH.toggle()
                         }
                 }
 
-                // Trip Distance
                 Text("Trip: \(distanceLabel)")
                     .font(.title2)
-                    .foregroundColor(.gray)
+                    .foregroundColor(secondaryTextColor)
 
-                // GPS Accuracy Display
                 Text(String(format: "GPS Accuracy: ±%.0f meters", locationManager.accuracy))
                     .font(.headline)
                     .foregroundColor(accuracyColor)
 
-                // Reset Button (smaller width)
                 Button(action: {
                     tripDistanceMeters = 0
                     previousLocation = nil
@@ -80,8 +89,8 @@ struct ContentView: View {
                         .font(.headline)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(Color.gray)
-                        .foregroundColor(.black)
+                        .background(secondaryTextColor)
+                        .foregroundColor(backgroundColor)
                         .cornerRadius(12)
                 }
 
@@ -89,7 +98,6 @@ struct ContentView: View {
             }
             .padding()
 
-            // Settings Button (Sprocket icon) at the bottom right with padding
             VStack {
                 Spacer()
                 HStack {
@@ -99,15 +107,18 @@ struct ContentView: View {
                             UIApplication.shared.open(url)
                         }
                     }) {
-                        Image(systemName: "gearshape.fill") // Sprocket icon
+                        Image(systemName: "gearshape.fill")
                             .font(.title2)
-                            .foregroundColor(.white)
+                            .foregroundColor(foregroundColor)
                             .padding()
                     }
-                    .padding(.bottom, 10) // Add some bottom padding
+                    .padding(.bottom, 10)
                 }
-                .padding(.trailing) // Keep the trailing padding for right alignment
+                .padding(.trailing)
             }
+        }
+        .onTapGesture {
+            isDarkMode.toggle() // Toggle between black/white background
         }
         .alert(isPresented: $locationManager.showAlert) {
             Alert(
