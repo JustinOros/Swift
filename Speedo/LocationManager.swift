@@ -117,20 +117,28 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             return
         }
 
+        // Skip updates if accuracy is too poor (≥ 20 meters)
+        guard latest.horizontalAccuracy >= 0 && latest.horizontalAccuracy < 20 else {
+            print("Skipping update due to poor accuracy: \(latest.horizontalAccuracy)")
+            return
+        }
+
         // Logging raw location data for debugging
         print("New location: \(latest.coordinate.latitude), \(latest.coordinate.longitude)")
         print("Speed (m/s): \(latest.speed)")
-        print("Speed (MPH): \(latest.speed * 2.23694)")
         print("Accuracy: \(latest.horizontalAccuracy)")
 
         DispatchQueue.main.async {
-            // Ensure speed is non-negative (as negative = invalid)
+            // Ensure speed is non-negative
             let rawSpeed = max(latest.speed, 0)
             
-            // Convert from meters per second to MPH
-            let mph = rawSpeed * 2.23694
+            // Ignore very small fluctuations when stopped (less than 0.5 m/s)
+            let filteredSpeed = rawSpeed < 0.5 ? 0 : rawSpeed
             
-            // Update published properties to refresh UI
+            // Convert from m/s to MPH
+            let mph = filteredSpeed * 2.23694
+            
+            // Update UI-bound values
             self.speed = Int(mph.rounded())
             self.location = latest
             self.accuracy = latest.horizontalAccuracy
