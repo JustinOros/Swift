@@ -13,35 +13,35 @@ struct ContentView: View {
     @State private var isMPH = true // Toggle between MPH and KPH
     @State private var previousLocation: CLLocation?
     @State private var tripDistanceMeters: Double = 0.0 // Trip distance in meters
-    @State private var isDarkMode = true // Theme toggle: dark/light
-    @State private var isMinimalView = false // Toggle minimal UI showing only speed
+    @State private var isDarkMode = true // Toggle dark/light mode
+    @State private var isMinimalView = false // Show only speed + unit if true
 
-    // Load saved trip distance when the view is initialized (even before body runs)
+    // Load saved trip distance from UserDefaults on launch
     init() {
         if let savedDistance = UserDefaults.standard.object(forKey: "TripDistance") as? Double {
             _tripDistanceMeters = State(initialValue: savedDistance)
         }
     }
 
-    // Current speed converted to either MPH or KPH
+    // Current speed value, converted to MPH or KPH
     var currentSpeed: Int {
         let multiplier = isMPH ? 1.0 : 1.60934
         return Int(Double(locationManager.speed) * multiplier)
     }
 
-    // Display correct unit
+    // Speed unit label
     var unitLabel: String {
         isMPH ? "mph" : "kph"
     }
 
-    // Display formatted trip distance
+    // Formatted trip distance string
     var distanceLabel: String {
         let distance = isMPH ? tripDistanceMeters * 0.000621371 : tripDistanceMeters / 1000
         let roundedDistance = Int(distance.rounded())
         return "\(roundedDistance) \(isMPH ? "miles" : "km")"
     }
 
-    // Color based on GPS accuracy
+    // Dynamic color based on GPS accuracy
     var accuracyColor: Color {
         switch locationManager.accuracy {
         case ..<10:
@@ -73,7 +73,7 @@ struct ContentView: View {
             VStack(spacing: 30) {
                 Spacer()
 
-                // Speed value and unit
+                // Speed + unit
                 HStack(alignment: .bottom, spacing: 4) {
                     Text("\(currentSpeed)")
                         .font(.system(size: 140, weight: .bold, design: .rounded))
@@ -83,45 +83,45 @@ struct ContentView: View {
                         .font(.title2)
                         .foregroundColor(secondaryTextColor)
                         .onTapGesture {
-                            isMPH.toggle() // Tap to switch between MPH/KPH
+                            isMPH.toggle()
                         }
                 }
 
-                // Extra details (hidden in minimal mode)
+                // Optional elements hidden in minimal mode
                 if !isMinimalView {
-                    Text("Trip: \(distanceLabel)")
-                        .font(.title2)
-                        .foregroundColor(secondaryTextColor)
+                    // Trip distance + reset icon
+                    HStack(spacing: 8) {
+                        Text("Trip: \(distanceLabel)")
+                            .font(.title2)
+                            .foregroundColor(secondaryTextColor)
 
+                        Button(action: {
+                            tripDistanceMeters = 0
+                            previousLocation = nil
+                            UserDefaults.standard.set(0.0, forKey: "TripDistance") // Clear saved value
+                        }) {
+                            Image(systemName: "arrow.counterclockwise.circle")
+                                .font(.title2)
+                                .foregroundColor(secondaryTextColor)
+                        }
+                        .buttonStyle(PlainButtonStyle()) // No tap glow
+                    }
+
+                    // GPS accuracy display
                     Text(String(format: "GPS Accuracy: ±%.0f meters", locationManager.accuracy))
                         .font(.headline)
                         .foregroundColor(accuracyColor)
-
-                    // Reset trip button clears distance and saved value
-                    Button(action: {
-                        tripDistanceMeters = 0
-                        previousLocation = nil
-                        UserDefaults.standard.set(0.0, forKey: "TripDistance") // Clear persistence
-                    }) {
-                        Text("Reset Trip")
-                            .font(.headline)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 10)
-                            .background(secondaryTextColor)
-                            .foregroundColor(backgroundColor)
-                            .cornerRadius(12)
-                    }
                 }
 
                 Spacer()
             }
             .padding()
 
-            // Bottom control buttons
+            // Bottom toolbar
             VStack {
                 Spacer()
                 HStack {
-                    // Toggle minimal/full view
+                    // Minimal mode toggle (eye icon)
                     Button(action: {
                         isMinimalView.toggle()
                     }) {
@@ -133,7 +133,7 @@ struct ContentView: View {
 
                     Spacer()
 
-                    // Open device Settings
+                    // Open app Settings
                     Button(action: {
                         if let url = URL(string: UIApplication.openSettingsURLString) {
                             UIApplication.shared.open(url)
@@ -149,12 +149,12 @@ struct ContentView: View {
             }
         }
 
-        // Tap anywhere to toggle dark/light mode
+        // Tap background to toggle dark/light mode
         .onTapGesture {
             isDarkMode.toggle()
         }
 
-        // Show alert if permissions or GPS fail
+        // Show alert when location fails
         .alert(isPresented: $locationManager.showAlert) {
             Alert(
                 title: Text("Location Services"),
@@ -167,15 +167,13 @@ struct ContentView: View {
             )
         }
 
-        // Update trip distance whenever a new location is received
+        // Track trip distance by accumulating changes between locations
         .onReceive(locationManager.$location) { location in
             if let newLocation = location {
                 if let oldLocation = previousLocation {
                     let distance = newLocation.distance(from: oldLocation)
                     tripDistanceMeters += distance
-
-                    // Save updated trip distance
-                    UserDefaults.standard.set(tripDistanceMeters, forKey: "TripDistance")
+                    UserDefaults.standard.set(tripDistanceMeters, forKey: "TripDistance") // Persist distance
                 }
                 previousLocation = newLocation
             }
