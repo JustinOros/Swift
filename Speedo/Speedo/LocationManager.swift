@@ -1,9 +1,6 @@
-//
-//  LocationManager.swift
-//  Speedometer
-//
-//  Created by Justin Oros on 5/2/2025.
-//
+// Speedometer App for iOS
+// Author: Justin Oros
+// LocationManager.swift
 
 import Foundation
 import CoreLocation
@@ -12,7 +9,7 @@ import SwiftUI
 class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
 
-    @Published var speed: Int = 0
+    @Published var speedInMS: Double = 0.0
     @Published var location: CLLocation?
     @Published var accuracy: Double = 0.0
     @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
@@ -25,89 +22,80 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         manager.activityType = .automotiveNavigation
         manager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
         manager.distanceFilter = 1
-        print("LocationManager initialized")
+
         requestAuthorization()
         startUpdatingLocationIfNeeded()
     }
 
+    // Request location access permission
     private func requestAuthorization() {
-        print("Requesting location authorization")
         manager.requestWhenInUseAuthorization()
     }
 
+    // Begin location updates if permission is granted
     private func startUpdatingLocationIfNeeded() {
         if authorizationStatus == .authorizedAlways || authorizationStatus == .authorizedWhenInUse {
-            print("Attempting to start location updates")
             manager.startUpdatingLocation()
         } else if authorizationStatus == .denied || authorizationStatus == .restricted {
-            print("Location updates not started due to denied/restricted authorization")
             DispatchQueue.main.async {
                 self.showAlert = true
                 self.alertMessage = "Location services are disabled. Please enable them in Settings."
             }
-        } else {
-            print("Authorization not yet determined: \(authorizationStatus.rawValue)")
         }
     }
 
+    // Handle changes in authorization status
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
         DispatchQueue.main.async {
             self.authorizationStatus = status
-            print("Authorization status changed: \(status.rawValue)")
             self.startUpdatingLocationIfNeeded()
         }
 
         switch status {
-        case .authorizedAlways:
-            print("Location authorization: Authorized Always")
-        case .authorizedWhenInUse:
-            print("Location authorization: Authorized When In Use")
         case .denied:
-            print("Location authorization: Denied")
             DispatchQueue.main.async {
                 self.showAlert = true
-                self.alertMessage = "Location access was denied. Please enable it in Settings for the app to function correctly."
+                self.alertMessage = "Location access was denied. Please enable it in Settings."
             }
         case .restricted:
-            print("Location authorization: Restricted")
             DispatchQueue.main.async {
                 self.showAlert = true
-                self.alertMessage = "Location access is restricted. This might be due to parental controls or system settings."
+                self.alertMessage = "Location access is restricted."
             }
-        case .notDetermined:
-            print("Location authorization: Not Determined")
-        @unknown default:
-            print("Location authorization: Unknown status")
+        default: break
         }
     }
 
+    // Handle new location data
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let latest = locations.last else {
-            print("No latest location found")
-            return
-        }
-
-        print("New location: \(latest.coordinate.latitude), \(latest.coordinate.longitude)")
-        print("Speed (m/s): \(latest.speed)")
-        print("Speed (MPH): \(latest.speed * 2.23694)")
-        print("Accuracy: \(latest.horizontalAccuracy)")
+        guard let latest = locations.last,
+              latest.horizontalAccuracy >= 0,
+              latest.horizontalAccuracy < 20 else { return }
 
         DispatchQueue.main.async {
             let rawSpeed = max(latest.speed, 0)
-            let mph = rawSpeed * 2.23694
-            self.speed = Int(mph.rounded())
+            self.speedInMS = rawSpeed < 0.5 ? 0 : rawSpeed
             self.location = latest
             self.accuracy = latest.horizontalAccuracy
         }
     }
 
+    // Handle location update errors
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        print("Location update failed: \(error.localizedDescription)")
+        let nsError = error as NSError
+
+        // Ignore transient or non-critical errors
+        if nsError.code == CLError.locationUnknown.rawValue ||
+           nsError.code == CLError.network.rawValue ||
+           nsError.code == CLError.denied.rawValue ||
+           nsError.code == CLError.deferredFailed.rawValue {
+            return
+        }
+
         DispatchQueue.main.async {
             self.showAlert = true
             self.alertMessage = "Location update failed: \(error.localizedDescription)"
         }
     }
 }
-

@@ -1,113 +1,146 @@
-//
-//  ContentView.swift
-//  Speedometer
-//
-//  Created by Justin Oros on 5/2/2025.
-//
+// Speedometer App for iOS
+// Author: Justin Oros
+// ContentView.swift
 
 import SwiftUI
 import CoreLocation
 
 struct ContentView: View {
     @StateObject private var locationManager = LocationManager()
-    @State private var isMPH = true
-    @State private var previousLocation: CLLocation?
-    @State private var tripDistanceMeters: Double = 0.0
 
+    // App storage settings
+    @AppStorage("SpeedUnitIsMPH") private var isMPH: Bool = true
+    @AppStorage("DarkModeEnabled") private var isDarkMode: Bool = true // Default to dark mode
+    @AppStorage("MinimalViewEnabled") private var isMinimalView: Bool = false
+    @AppStorage("TripDistance") private var tripDistanceMeters: Double = 0.0
+
+    @State private var previousLocation: CLLocation?
+
+    // Converts speed in m/s to selected unit
     var currentSpeed: Int {
-        let multiplier = isMPH ? 1.0 : 1.60934 // Already in MPH from LocationManager
-        return Int(Double(locationManager.speed) * multiplier)
+        let speedMS = locationManager.speedInMS
+        let converted = isMPH ? speedMS * 2.23694 : speedMS * 3.6
+        return Int(converted.rounded())
     }
 
+    // Returns unit label string
     var unitLabel: String {
         isMPH ? "mph" : "kph"
     }
 
+    // Converts and formats trip distance string
     var distanceLabel: String {
         let distance = isMPH ? tripDistanceMeters * 0.000621371 : tripDistanceMeters / 1000
-        let roundedDistance = Int(distance.rounded())
-        return "\(roundedDistance) \(isMPH ? "miles" : "km")"
+        return "\(Int(distance.rounded())) \(isMPH ? "miles" : "km")"
     }
 
+    // Determines color based on GPS accuracy
     var accuracyColor: Color {
         switch locationManager.accuracy {
-        case ..<10:
-            return .green
-        case 10..<30:
-            return .orange
-        default:
-            return .red
+        case ..<10: return .green
+        case 10..<30: return .orange
+        default: return .red
         }
+    }
+
+    // UI colors
+    var foregroundColor: Color {
+        isDarkMode ? .white : .black
+    }
+
+    var secondaryTextColor: Color {
+        .gray
+    }
+
+    var backgroundColor: Color {
+        isDarkMode ? .black : .white
     }
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            backgroundColor.ignoresSafeArea()
 
             VStack(spacing: 30) {
                 Spacer()
 
-                // Center Speed Display with Unit
+                // Main speed display
                 HStack(alignment: .bottom, spacing: 4) {
                     Text("\(currentSpeed)")
                         .font(.system(size: 140, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(foregroundColor)
 
                     Text(unitLabel)
                         .font(.title2)
-                        .foregroundColor(.gray)
+                        .foregroundColor(secondaryTextColor)
                         .onTapGesture {
                             isMPH.toggle()
                         }
                 }
 
-                // Trip Distance
-                Text("Trip: \(distanceLabel)")
-                    .font(.title2)
-                    .foregroundColor(.gray)
+                if !isMinimalView {
+                    // Trip distance and reset button
+                    HStack(spacing: 8) {
+                        Text("Trip: \(distanceLabel)")
+                            .font(.title2)
+                            .foregroundColor(secondaryTextColor)
 
-                // GPS Accuracy Display
-                Text(String(format: "GPS Accuracy: ±%.0f meters", locationManager.accuracy))
-                    .font(.headline)
-                    .foregroundColor(accuracyColor)
+                        Button(action: {
+                            tripDistanceMeters = 0
+                            previousLocation = nil
+                        }) {
+                            Image(systemName: "arrow.counterclockwise.circle")
+                                .font(.title2)
+                                .foregroundColor(secondaryTextColor)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
 
-                // Reset Button (smaller width)
-                Button(action: {
-                    tripDistanceMeters = 0
-                    previousLocation = nil
-                }) {
-                    Text("Reset Trip")
+                    // GPS accuracy display
+                    Text(String(format: "GPS Accuracy: ±%.0f meters", locationManager.accuracy))
                         .font(.headline)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(Color.gray)
-                        .foregroundColor(.black)
-                        .cornerRadius(12)
+                        .foregroundColor(accuracyColor)
+                } else if locationManager.accuracy == 0 {
+                    Text("Waiting for GPS...")
+                        .foregroundColor(.gray)
                 }
 
                 Spacer()
             }
             .padding()
 
-            // Settings Button (Sprocket icon) at the bottom right with padding
+            // Toggle buttons
             VStack {
                 Spacer()
                 HStack {
+                    // Toggle minimal/full view
+                    Button(action: {
+                        isMinimalView.toggle()
+                    }) {
+                        Image(systemName: isMinimalView ? "eye.slash.fill" : "eye.fill")
+                            .font(.title2)
+                            .foregroundColor(foregroundColor)
+                            .padding()
+                    }
+
                     Spacer()
+
+                    // Open app settings
                     Button(action: {
                         if let url = URL(string: UIApplication.openSettingsURLString) {
                             UIApplication.shared.open(url)
                         }
                     }) {
-                        Image(systemName: "gearshape.fill") // Sprocket icon
+                        Image(systemName: "gearshape.fill")
                             .font(.title2)
-                            .foregroundColor(.white)
+                            .foregroundColor(foregroundColor)
                             .padding()
                     }
-                    .padding(.bottom, 10) // Add some bottom padding
                 }
-                .padding(.trailing) // Keep the trailing padding for right alignment
+                .padding([.leading, .trailing, .bottom], 10)
             }
+        }
+        .onTapGesture {
+            isDarkMode.toggle()
         }
         .alert(isPresented: $locationManager.showAlert) {
             Alert(
@@ -120,8 +153,11 @@ struct ContentView: View {
                 }
             )
         }
+        // Update trip distance with each valid location update
         .onReceive(locationManager.$location) { location in
-            if let newLocation = location {
+            if let newLocation = location,
+               newLocation.speed > 0.5,
+               newLocation.horizontalAccuracy < 20 {
                 if let oldLocation = previousLocation {
                     let distance = newLocation.distance(from: oldLocation)
                     tripDistanceMeters += distance
@@ -131,3 +167,4 @@ struct ContentView: View {
         }
     }
 }
+

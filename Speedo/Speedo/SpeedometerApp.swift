@@ -1,9 +1,6 @@
-//
+// Speedometer App for iOS
+// Author: Justin Oros
 //  SpeedometerApp.swift
-//  Speedometer
-//
-//  Created by Justin Oros on 5/2/2025.
-//
 
 import SwiftUI
 
