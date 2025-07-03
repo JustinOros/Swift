@@ -23,7 +23,7 @@ struct QuizView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             if loadError {
-                Text("Could not load questions for \(testName). Make sure the .json file is included in the app bundle or Documents folder.")
+                Text("Could not load questions for \(testName).")
                     .foregroundColor(.red)
                     .padding()
             } else if questions.isEmpty {
@@ -36,6 +36,7 @@ struct QuizView: View {
 
                 ForEach(questions[currentIndex].answers, id: \.self) { answer in
                     Button(action: {
+                        guard selectedAnswer == nil else { return }
                         selectedAnswer = answer
                         checkAnswer()
 
@@ -58,6 +59,7 @@ struct QuizView: View {
                             .foregroundColor(.white)
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .disabled(selectedAnswer != nil)
                 }
 
                 Text(feedbackText)
@@ -92,6 +94,7 @@ struct QuizView: View {
         .padding()
         .onAppear(perform: syncAndLoadQuestions)
         .navigationTitle(testName + " Test")
+            .navigationBarBackButtonHidden(true)
         .alert(isPresented: $showSummaryAlert) {
             let percentage = currentIndex > 0 ? Int((Double(score) / Double(currentIndex + 1)) * 100) : 0
             return Alert(
