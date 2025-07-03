@@ -1,4 +1,4 @@
-Speedo -- GPS Speedometer app for iOS.
+Speedo -- GPS Speedometer app for iPhone.
 
 HAM Operator Quiz -- Amateur Radio License exam preparation for Mac.
 
