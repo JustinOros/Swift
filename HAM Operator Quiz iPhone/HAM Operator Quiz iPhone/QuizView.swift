@@ -52,7 +52,7 @@ struct QuizView: View {
                             .padding(10)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(
-                                Capsule()
+                                RoundedRectangle(cornerRadius: 10)
                                     .fill(bubbleColor(for: answer))
                             )
                             .foregroundColor(.white)
@@ -64,18 +64,18 @@ struct QuizView: View {
                     .foregroundColor(feedbackColor)
 
                 HStack {
+                    Button("Quit") {
+                        showSummaryAlert = true
+                    }
+                    .tint(Color.gray)
+
+                    Spacer()
+
                     Button("Next") {
                         nextQuestion()
                     }
                     .disabled(selectedAnswer == nil)
                     .tint(Color.blue)
-
-                    Spacer()
-
-                    Button("Quit") {
-                        showSummaryAlert = true
-                    }
-                    .tint(Color.gray)
                 }
                 .padding(.top, 10)
 
